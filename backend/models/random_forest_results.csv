@@ -1,0 +1,2 @@
+model,best_params,accuracy,precision,recall,f1
+Random Forest,"{'model__max_depth': 15, 'model__min_samples_leaf': 4, 'model__n_estimators': 300}",0.3379837553750597,0.2986366033420723,0.3379837553750597,0.30818214757649737

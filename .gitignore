@@ -1,0 +1,23 @@
+node_modules
+dist
+.vite
+*.local
+
+# Python backend
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.log
+
+# Trained models are shared out of band, not committed. random_forest_model.pkl
+# is 124 MB on its own, over GitHub's 100 MB per-file limit, so this is a hard
+# constraint and not just a preference.
+backend/models/*.pkl
+backend/models/*.joblib
+backend/models/*.json
+backend/models/*.ubj
+
+# Holds the full 10,465-row test set, one row per patient. De-identified and
+# scaled, but patient-level all the same -- kept out until someone decides it
+# should be public, because git history is hard to take back.
+backend/models/xgboost_results.xlsx
