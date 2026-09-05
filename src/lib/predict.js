@@ -9,7 +9,8 @@
  * worse than an error banner, so a failed call surfaces as a failed call.
  */
 
-const API_URL = '/api/predict';
+import { apiRequest, ApiError } from './api';
+import { getToken, clearSession } from './session';
 
 // Clinical order, worst to best — the order Tumor_Response was encoded in.
 const CLASS_ORDER = ['Progressive', 'Stable', 'Partial', 'Complete'];
@@ -41,27 +42,21 @@ export async function predictOutcome(patient) {
 }
 
 async function fetchPrediction(patient) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patient),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(describeError(body) ?? `Prediction service returned ${res.status}`);
+  try {
+    return await apiRequest('/api/predict', {
+      method: 'POST',
+      body: patient,
+      token: getToken(),
+    });
+  } catch (err) {
+    // An expired or otherwise rejected token shows the login screen again;
+    // don't leave the user staring at a stale 401 on the dashboard.
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      clearSession();
+      window.dispatchEvent(new Event('oncopredict:logout'));
+    }
+    throw err;
   }
-  return res.json();
-}
-
-/** FastAPI sends a string for our own aborts and a list for schema failures. */
-function describeError(body) {
-  const detail = body?.detail;
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail)) {
-    return detail.map((item) => `${item.loc?.at(-1) ?? 'field'}: ${item.msg}`).join('; ');
-  }
-  return null;
 }
 
 /** Known classes first, in clinical order, then anything unexpected. */

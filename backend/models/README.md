@@ -1,5 +1,12 @@
 # Drop trained models here
 
+The model files are not in git — `random_forest_model.pkl` is 121 MB, over
+GitHub's 100 MB per-file limit. They live in a private release instead:
+
+```bash
+gh release download models-v1 --repo Blexalmighty/CPE-508-group-project --dir backend/models
+```
+
 The backend loads one file at startup, trying these names in order:
 
 | File | Notes |
@@ -70,6 +77,9 @@ curl http://127.0.0.1:8000/api/health
 
 `detail` reports the filename, estimator class, target, and feature count, e.g.
 `model.pkl: XGBClassifier predicting Tumor_Response over 15 features`.
+
+`/api/health` needs no token. `/api/predict` does — see the Authentication
+section of the root README.
 
 ## Notes
 

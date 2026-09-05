@@ -303,7 +303,50 @@ the sidebar collapsing to a top bar. A varied patient (Leukemia, Stage IV, 600
 mg/m²) returns 56% with a 20/24/32/24 breakdown against the baseline's 55% and
 18/27/32/23, so the dashboard visibly tracks input.
 
-## 8. Files changed
+## 8. Deployment changes
+
+Added when the app was prepared for a split deploy — static frontend on one
+host, FastAPI on another.
+
+**Authentication.** `/api/predict` now requires a bearer token issued by
+`/api/login`. `auth.py` checks the submitted credentials against `STAFF_ID` and
+`STAFF_PASSWORD` from the environment, using `hmac.compare_digest` so a wrong
+password takes the same time as a right one. Tokens are HMAC-SHA256 signed and
+carry an 8-hour expiry; a rejected token clears the session and returns the user
+to the login screen rather than leaving a dead dashboard on screen.
+
+The service refuses to start when those variables are missing, which is
+deliberate — the failure mode of a silently unauthenticated deployment is worse
+than a crash on boot.
+
+Verified: valid login issues a token, wrong password and wrong staff ID both
+give 401, and a request with no token, a tampered token, or an expired token is
+rejected. Field validation still returns its 422s once authenticated, so the
+auth layer sits in front of the existing error handling rather than replacing it.
+
+What this is not: there is no user database, no password hash at rest, no
+per-user audit trail, and no login rate limiting. It is one shared credential
+sized for a demo. Any real deployment needs all four.
+
+**CORS.** `ALLOWED_ORIGINS` (comma-separated) configures the allowed frontend
+origins, defaulting to the two dev-server addresses. `allow_credentials` is off
+because the token travels in a header, not a cookie.
+
+**Configurable API origin.** `src/lib/api.js` reads `VITE_API_URL`, baked in at
+build time. Unset, requests go to `/api` on the same origin, which is what the
+Vite dev proxy expects. A static deploy that forgets it will fail on every
+prediction, so it is called out in the README.
+
+**Models moved to a private release.** `random_forest_model.pkl` is 121 MB,
+over GitHub's 100 MB per-file limit, so the three model files ship as release
+`models-v1` rather than in the tree. One command pulls them into place.
+
+**The disclaimer banner was removed** from the results dashboard at the team's
+request. The "estimate" badge on the Completion card stays: that number is
+rule-based rather than modelled, and the badge is now the only thing on screen
+saying so.
+
+## 9. Files changed
 
 Backend, all rewritten:
 

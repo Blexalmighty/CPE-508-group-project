@@ -1,20 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Activity, FileText, LogOut, Stethoscope } from 'lucide-react';
 import LoginScreen from './components/LoginScreen.jsx';
 import PatientForm from './components/PatientForm.jsx';
 import ResultsDashboard from './components/ResultsDashboard.jsx';
 import { INITIAL_FORM, toPayload } from './lib/fields.js';
 import { predictOutcome } from './lib/predict.js';
+import { clearSession, getStaff, getToken } from './lib/session.js';
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(() => (getToken() ? getStaff() : null));
   const [form, setForm] = useState(INITIAL_FORM);
   const [result, setResult] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  if (!isLoggedIn) {
-    return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
+  // A 401 from /api/predict (expired session) clears the token and dispatches
+  // this event — drop back to the login screen instead of a stale dashboard.
+  useEffect(() => {
+    const handleLogout = () => {
+      setUser(null);
+      setResult(null);
+      setError(null);
+    };
+    window.addEventListener('oncopredict:logout', handleLogout);
+    return () => window.removeEventListener('oncopredict:logout', handleLogout);
+  }, []);
+
+  if (!user) {
+    return <LoginScreen onLogin={() => setUser(getStaff())} />;
   }
 
   const updateField = ({ target }) => {
@@ -24,6 +37,13 @@ export default function App() {
   const startNewEntry = () => {
     setResult(null);
     setForm(INITIAL_FORM);
+    setError(null);
+  };
+
+  const signOut = () => {
+    clearSession();
+    setUser(null);
+    setResult(null);
     setError(null);
   };
 
@@ -73,8 +93,9 @@ export default function App() {
         </nav>
 
         <div className="p-4 border-t border-slate-800">
+          <p className="text-xs text-slate-500 mb-2 px-1 truncate">Signed in: {user}</p>
           <button
-            onClick={() => setIsLoggedIn(false)}
+            onClick={signOut}
             className="flex items-center text-slate-400 hover:text-white transition-colors text-sm w-full"
           >
             <LogOut className="w-4 h-4 mr-2" /> Secure Logout
@@ -88,7 +109,7 @@ export default function App() {
             <Stethoscope className="w-6 h-6 text-blue-400 mr-2" />
             <span className="font-bold">OncoPredict</span>
           </div>
-          <button onClick={() => setIsLoggedIn(false)} className="text-slate-400 hover:text-white">
+          <button onClick={signOut} className="text-slate-400 hover:text-white">
             <LogOut className="w-5 h-5" />
           </button>
         </header>

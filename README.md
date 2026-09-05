@@ -19,13 +19,30 @@ py -3.12 -m venv .venv
 .venv/Scripts/python.exe -m pip install -r requirements.txt
 ```
 
+The trained models are not in git (`random_forest_model.pkl` alone is 121 MB,
+over GitHub's 100 MB per-file limit). Pull them from the private release into
+`backend/models/`:
+
+```bash
+gh release download models-v1 --repo Blexalmighty/CPE-508-group-project --dir backend/models
+```
+
+Then copy `backend/.env.example` to `backend/.env` and fill in the login
+credentials and a token secret. The service refuses to start without them:
+
+```bash
+cp backend/.env.example backend/.env
+python -c "import secrets; print(secrets.token_urlsafe(32))"   # paste as TOKEN_SECRET
+```
+
 Then each session:
 
 ```bash
 .venv/Scripts/python.exe -m uvicorn main:app --reload --port 8000
 ```
 
-Open http://localhost:5173. Login is not real auth — any credentials get through.
+Open http://localhost:5173 and sign in with the `STAFF_ID` / `STAFF_PASSWORD`
+from your `.env`.
 
 Vite proxies `/api` to port 8000, so there's no CORS setup in development. Both
 processes need to be running: there is no offline mock, because a fabricated
@@ -33,6 +50,56 @@ score that looks like a model output is worse than an error banner.
 
 Python 3.12 rather than 3.14: the 3.14 wheels for pandas/scikit-learn/XGBoost
 weren't available, so installing on 3.14 tries to compile from source.
+
+## Deploying
+
+The frontend is static and the backend is a Python service, so they go to two
+different hosts.
+
+**Backend** (Render, Railway, Fly, a VPS — anything that runs Python):
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+Set these environment variables on the host — they are what `.env` holds
+locally:
+
+| Variable | Purpose |
+| --- | --- |
+| `STAFF_ID` | The login username |
+| `STAFF_PASSWORD` | The login password |
+| `TOKEN_SECRET` | Signs session tokens; 32+ random characters |
+| `ALLOWED_ORIGINS` | Your frontend URL, e.g. `https://oncopredict.vercel.app` |
+
+The models must be present in `backend/models/` on the server — either commit
+the release-download step into your build, or upload them once to a persistent
+disk.
+
+**Frontend** (Vercel, Netlify, GitHub Pages):
+
+```bash
+VITE_API_URL=https://your-api-host.example.com npm run build
+```
+
+`VITE_API_URL` is baked in at build time. Without it the app calls `/api` on its
+own origin, which only works behind the dev proxy — so a static deploy that
+skips it will show "Prediction failed" on every submit.
+
+Deploy the resulting `dist/` folder. Set the same URL in `ALLOWED_ORIGINS` on
+the backend or the browser will block the call as a CORS error.
+
+## Authentication
+
+`/api/predict` requires a bearer token; `/api/login` issues one against the
+`STAFF_ID` / `STAFF_PASSWORD` environment variables. Tokens are HMAC-signed and
+expire after 8 hours, and the frontend drops back to the login screen when one
+is rejected.
+
+This is single-shared-credential authentication sized for a project demo, not a
+clinical system: there is no user database, no password hashing at rest, no
+per-user audit trail, and no rate limiting on login attempts. Anything handling
+real patient data needs all four.
 
 ## Which model is serving
 
@@ -85,8 +152,9 @@ weights are invented and carry no clinical validity.
 
 ## API
 
-**Request** — `POST /api/predict`. The first block feeds the model; bounds are
-the documented valid ranges from report §3.1.2.
+**Request** — `POST /api/predict`, with `Authorization: Bearer <token>` from
+`/api/login`. The first block feeds the model; bounds are the documented valid
+ranges from report §3.1.2.
 
 | Field | Type | Range / options |
 | --- | --- | --- |
@@ -151,18 +219,22 @@ category comes back as a 422 naming the field and the categories it accepts.
 src/
   App.jsx                        state and layout shell
   components/
-    LoginScreen.jsx
+    LoginScreen.jsx              posts credentials to /api/login
     PatientForm.jsx              renders sections from config
     Field.jsx                    one input, driven by a config entry
     ResultsDashboard.jsx         metric cards, class breakdown, recommendations
   lib/
+    api.js                       fetch wrapper, VITE_API_URL, error shaping
+    session.js                   login call and token storage
     fields.js                    form schema: inputs, initial state, payload
     predict.js                   API call, risk bands, recommendation rules
 backend/
-  main.py                        FastAPI app and routes
+  main.py                        FastAPI app, routes, CORS
+  auth.py                        credentials, token issuing and verification
   registry.py                    model discovery and probability extraction
   features.py                    form payload to feature frame (report 3.1.2)
   schemas.py                     request/response validation
+  .env.example                   copy to .env and fill in
   models/                        drop trained models here
 ```
 
@@ -175,4 +247,5 @@ backend/
   Random Forest uses 14 — with training categories and documented ranges enforced
   on both sides.
 - Completion likelihood is a labelled rule-based estimate, not a model.
-- Login is not real auth.
+- Login checks a single shared credential against the server; see
+  [Authentication](#authentication) for what that does and does not cover.

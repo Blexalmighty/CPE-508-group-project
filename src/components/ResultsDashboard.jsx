@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, CheckCircle, Info, TrendingUp } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Info, TrendingUp } from 'lucide-react';
 
 // Badge and bar colours are keyed off the risk band so the visuals track the
 // score instead of being pinned to one outcome.
@@ -62,27 +62,6 @@ export default function ResultsDashboard({ result, patient, onReset }) {
         >
           <ArrowLeft className="w-4 h-4 mr-2" /> New Patient
         </button>
-      </div>
-
-      <div className="mb-6 flex items-start bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-4">
-        <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5 text-amber-500" />
-        <div className="text-sm">
-          <p>
-            <span className="font-medium">Response</span> is predicted by{' '}
-            <code className="font-mono text-xs bg-amber-100 px-1 py-0.5 rounded">{result.modelName}</code> as
-            P(Partial) + P(Complete).
-            {result.completionIsEstimate && (
-              <>
-                {' '}
-                <span className="font-medium">Completion</span> is a rule-based estimate — no completion model has been
-                trained yet.
-              </>
-            )}
-          </p>
-          <p className="mt-1 text-amber-800">
-            An auxiliary risk-flagging aid only. It does not replace clinical judgement.
-          </p>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
