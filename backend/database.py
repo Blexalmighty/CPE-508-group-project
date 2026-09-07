@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 from typing import Any
@@ -5,7 +6,14 @@ from typing import Any
 from sqlalchemy import DateTime, JSON, String, create_engine, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
+log = logging.getLogger("oncopredict")
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
+if DATABASE_URL.startswith("postgresql+psycopg2://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
 
 
 class Base(DeclarativeBase):
@@ -26,7 +34,12 @@ class PredictionRecord(Base):
     )
 
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True) if DATABASE_URL else None
+try:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True) if DATABASE_URL else None
+except ModuleNotFoundError as err:
+    log.warning("PostgreSQL driver unavailable; continuing without DB persistence: %s", err)
+    engine = None
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False) if engine else None
 
 
