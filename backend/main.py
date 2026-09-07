@@ -25,7 +25,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import auth
-from database import init_db, save_prediction
 from registry import ModelUnavailable, registry
 from schemas import HealthResponse, PatientRequest, PredictionResponse
 
@@ -38,7 +37,6 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     registry.load()  # unpickling once at startup keeps requests fast
-    init_db()
     yield
 
 
@@ -90,6 +88,21 @@ def login(credentials: LoginRequest):
     return LoginResponse(token=auth.login(credentials.staffId, credentials.password), staff=credentials.staffId)
 
 
+@app.post("/api/logout")
+def logout(authorization: str | None = None):
+    """Explicit logout endpoint. The app clears session state client-side, but
+    this endpoint validates any provided bearer token and returns a success
+    message so the flow is intentional and inspectable in the API."""
+    if authorization:
+        try:
+            auth.authenticate(authorization)
+        except HTTPException:
+            # A stale or already-invalid token should still count as a logout
+            # attempt; the client will clear local state regardless.
+            pass
+    return {"ok": True, "message": "Logged out successfully."}
+
+
 @app.post("/api/predict", response_model=PredictionResponse)
 def predict(patient: PatientRequest, staff: str = Depends(_require_auth)):
     if not registry.ready:
@@ -110,7 +123,7 @@ def predict(patient: PatientRequest, staff: str = Depends(_require_auth)):
             detail=f"Model rejected the feature frame: {err}",
         ) from err
 
-    response = PredictionResponse(
+    return PredictionResponse(
         responseProbability=favourable,
         predictedClass=predicted,
         classProbabilities=by_class,
@@ -118,12 +131,3 @@ def predict(patient: PatientRequest, staff: str = Depends(_require_auth)):
         modelName=registry.model.name,
         target=registry.model.target,
     )
-
-    # Persist the request/response pair when PostgreSQL is configured.
-    save_prediction(
-        staff,
-        patient.model_dump(mode="json"),
-        response.model_dump(mode="json"),
-    )
-
-    return response

@@ -22,11 +22,18 @@ import time
 from fastapi import Header, HTTPException
 
 TOKEN_TTL_SECONDS = 8 * 60 * 60  # 8 hours -- one working day
+ADMIN_EMAIL = "blessedbaidoo79@gmail.com"
 
 
 def config() -> tuple[str, str, str]:
     """(staff_id, password, secret); raises if any piece is missing."""
-    staff_id = os.environ.get("STAFF_ID", "").strip()
+    # The admin access account is pinned to this email so the application can
+    # always authenticate against the intended administrator while still reading
+    # the password and token secret from configuration.
+    staff_id = os.environ.get("STAFF_ID", ADMIN_EMAIL).strip() or ADMIN_EMAIL
+    if staff_id.lower() != ADMIN_EMAIL.lower():
+        staff_id = ADMIN_EMAIL
+
     password = os.environ.get("STAFF_PASSWORD", "")
     secret = os.environ.get("TOKEN_SECRET", "").strip()
 
@@ -56,7 +63,8 @@ def login(staff_id: str, password: str) -> str:
     """Issue a signed token if the credentials match the configured ones."""
     expected_id, expected_pw, secret = config()
 
-    id_ok = hmac.compare_digest(staff_id.strip().encode(), expected_id.encode())
+    normalized_input = staff_id.strip()
+    id_ok = hmac.compare_digest(normalized_input.lower().encode(), expected_id.lower().encode())
     pw_ok = hmac.compare_digest(password.encode(), expected_pw.encode())
     if not (id_ok and pw_ok):
         raise HTTPException(status_code=401, detail="Invalid staff ID or password.")

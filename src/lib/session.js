@@ -22,6 +22,24 @@ export async function login(staffId, password) {
   return token;
 }
 
+export async function logout() {
+  const token = getToken();
+  clearSession();
+
+  if (!token) {
+    return { ok: true, message: 'Logged out successfully.' };
+  }
+
+  try {
+    return await apiRequest('/api/logout', {
+      method: 'POST',
+      token,
+    });
+  } catch {
+    return { ok: true, message: 'Logged out successfully.' };
+  }
+}
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }

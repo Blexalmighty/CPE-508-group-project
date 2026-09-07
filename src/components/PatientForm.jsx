@@ -16,6 +16,9 @@ export default function PatientForm({ form, onFieldChange, onSubmit, isSubmittin
         <p className="text-slate-600 mt-1">
           Enter patient clinical and socio-demographic data to generate an AI prediction.
         </p>
+        <p className="mt-3 text-sm text-slate-500">
+          Required fields are marked with <span className="text-red-500 font-medium">*</span> and should be completed before generating the prediction.
+        </p>
       </div>
 
       {error && (
@@ -68,6 +71,9 @@ export default function PatientForm({ form, onFieldChange, onSubmit, isSubmittin
                 'Generate AI Prediction'
               )}
             </button>
+          </div>
+          <div className="px-6 pb-6 text-xs text-slate-500">
+            This tool provides decision-support guidance only and should be reviewed alongside clinical judgement.
           </div>
         </form>
       </div>

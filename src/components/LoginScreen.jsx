@@ -48,13 +48,14 @@ export default function LoginScreen({ onLogin }) {
           <form className="space-y-6" onSubmit={handleSubmit}>
             <LoginField
               id="staffId"
-              label="Staff ID / Email"
+              label="Admin Email"
               type="text"
-              placeholder="Enter your staff ID"
+              placeholder="blessedbaidoo79@gmail.com"
               icon={User}
               value={staffId}
               onChange={(value) => setStaffId(value)}
             />
+            <p className="-mt-4 text-xs text-slate-500">Use the administrator email for access. Password is case-sensitive.</p>
             <LoginField
               id="password"
               label="Password"
@@ -75,7 +76,7 @@ export default function LoginScreen({ onLogin }) {
 
             <p className="text-xs text-center text-slate-400 flex items-center justify-center">
               <AlertTriangle className="w-3 h-3 mr-1" />
-              Protected area — staff credentials are checked by the server.
+              Protected admin area — credentials are checked by the server.
             </p>
           </form>
         </div>

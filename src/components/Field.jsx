@@ -4,26 +4,52 @@ const CONTROL = 'w-full border border-slate-300 rounded-md py-2 px-3 focus:ring-
 export default function Field({ field, value, onChange }) {
   // `default` only seeds INITIAL_FORM and `hint` renders below the control;
   // neither is a DOM attribute.
-  const { name, label, options, type, fullWidth, hint, default: _seed, ...attrs } = field;
+  const { name, label, options, type, fullWidth, hint, required, helperText, default: _seed, ...attrs } = field;
 
   return (
     <div className={fullWidth ? 'md:col-span-2' : undefined}>
       <label htmlFor={name} className="block text-sm font-medium text-slate-700 mb-1">
         {label}
+        {required && <span className="ml-1 text-red-500" aria-label="required field">*</span>}
       </label>
 
       {options ? (
-        <select id={name} name={name} value={value} onChange={onChange} className={CONTROL}>
+        <select
+          id={name}
+          name={name}
+          value={value}
+          onChange={onChange}
+          className={CONTROL}
+          required={required}
+        >
           {options.map((option) => (
             <option key={option}>{option}</option>
           ))}
         </select>
       ) : type === 'textarea' ? (
-        <textarea id={name} name={name} value={value} onChange={onChange} className={CONTROL} {...attrs} />
+        <textarea
+          id={name}
+          name={name}
+          value={value}
+          onChange={onChange}
+          className={CONTROL}
+          required={required}
+          {...attrs}
+        />
       ) : (
-        <input id={name} name={name} type={type ?? 'text'} value={value} onChange={onChange} className={CONTROL} {...attrs} />
+        <input
+          id={name}
+          name={name}
+          type={type ?? 'text'}
+          value={value}
+          onChange={onChange}
+          className={CONTROL}
+          required={required}
+          {...attrs}
+        />
       )}
 
+      {helperText && <p className="mt-1 text-xs text-slate-500">{helperText}</p>}
       {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );

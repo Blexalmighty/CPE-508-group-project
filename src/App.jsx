@@ -5,7 +5,7 @@ import PatientForm from './components/PatientForm.jsx';
 import ResultsDashboard from './components/ResultsDashboard.jsx';
 import { INITIAL_FORM, toPayload } from './lib/fields.js';
 import { predictOutcome } from './lib/predict.js';
-import { clearSession, getStaff, getToken } from './lib/session.js';
+import { clearSession, getStaff, getToken, logout } from './lib/session.js';
 
 export default function App() {
   const [user, setUser] = useState(() => (getToken() ? getStaff() : null));
@@ -14,6 +14,11 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  const syncHistoryState = (nextUser) => {
+    const screen = nextUser ? 'dashboard' : 'login';
+    window.history.pushState({ screen }, '', window.location.pathname);
+  };
+
   // A 401 from /api/predict (expired session) clears the token and dispatches
   // this event — drop back to the login screen instead of a stale dashboard.
   useEffect(() => {
@@ -21,13 +26,41 @@ export default function App() {
       setUser(null);
       setResult(null);
       setError(null);
+      window.history.pushState({ screen: 'login' }, '', window.location.pathname);
     };
+
+    const handlePopState = () => {
+      const hasSession = Boolean(getToken() && getStaff());
+      if (!hasSession) {
+        setUser(null);
+        setResult(null);
+        setError(null);
+      }
+    };
+
     window.addEventListener('oncopredict:logout', handleLogout);
-    return () => window.removeEventListener('oncopredict:logout', handleLogout);
-  }, []);
+    window.addEventListener('popstate', handlePopState);
+
+    if (window.history.state?.screen === undefined) {
+      window.history.replaceState({ screen: user ? 'dashboard' : 'login' }, '', window.location.pathname);
+    }
+
+    return () => {
+      window.removeEventListener('oncopredict:logout', handleLogout);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [user]);
 
   if (!user) {
-    return <LoginScreen onLogin={() => setUser(getStaff())} />;
+    return (
+      <LoginScreen
+        onLogin={() => {
+          const nextUser = getStaff();
+          setUser(nextUser);
+          syncHistoryState(nextUser);
+        }}
+      />
+    );
   }
 
   const updateField = ({ target }) => {
@@ -40,11 +73,17 @@ export default function App() {
     setError(null);
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    try {
+      await logout();
+    } catch {
+      // The API may be unavailable; the local session is still cleared.
+    }
     clearSession();
     setUser(null);
     setResult(null);
     setError(null);
+    syncHistoryState(null);
   };
 
   const handleSubmit = async (e) => {
@@ -83,13 +122,16 @@ export default function App() {
             />
             New Patient Entry
           </button>
-          <a
-            href="#"
-            className="text-slate-300 hover:bg-slate-700 hover:text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors"
+          <button
+            type="button"
+            disabled
+            className="w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md text-slate-400 cursor-not-allowed opacity-60"
+            aria-label="Saved patient records is coming soon"
           >
-            <Activity className="mr-3 flex-shrink-0 h-5 w-5 text-slate-400 group-hover:text-slate-300" />
-            Patient Database
-          </a>
+            <Activity className="mr-3 flex-shrink-0 h-5 w-5 text-slate-500" />
+            Saved Records
+            <span className="ml-auto text-[10px] uppercase tracking-wide text-slate-500">Soon</span>
+          </button>
         </nav>
 
         <div className="p-4 border-t border-slate-800">

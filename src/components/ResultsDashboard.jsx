@@ -64,6 +64,10 @@ export default function ResultsDashboard({ result, patient, onReset }) {
         </button>
       </div>
 
+      <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        Clinical guidance summary: use these estimates as support for discussion and review, not as a standalone treatment decision.
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {METRICS.map((metric) => (
           <MetricCard

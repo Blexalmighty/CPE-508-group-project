@@ -22,3 +22,5 @@ backend/models/*.ubj
 # scaled, but patient-level all the same -- kept out until someone decides it
 # should be public, because git history is hard to take back.
 backend/models/xgboost_results.xlsx
+docs/OncoPredict_Codebase_Documentation.pdf
+docs/OncoPredict_Codebase_Documentation.docx
