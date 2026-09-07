@@ -58,6 +58,20 @@ different hosts.
 
 **Backend** (Render, Railway, Fly, a VPS — anything that runs Python):
 
+For Render, create a **Web Service** from this repository with these settings
+(or apply the included `render.yaml` Blueprint):
+
+| Setting | Value |
+| --- | --- |
+| Runtime | `Python 3` |
+| Root Directory | `backend` |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+
+Do not use `npm start` for this service. The repository root is the React/Vite
+frontend, and it intentionally has no Node server; the API entrypoint is
+`backend/main.py`.
+
 ```bash
 uvicorn main:app --host 0.0.0.0 --port $PORT
 ```

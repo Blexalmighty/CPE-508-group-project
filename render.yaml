@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: oncopredict-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: STAFF_ID
+        sync: false
+      - key: STAFF_PASSWORD
+        sync: false
+      - key: TOKEN_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        sync: false
