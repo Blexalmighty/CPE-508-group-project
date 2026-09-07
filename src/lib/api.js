@@ -9,7 +9,14 @@
 // In production the static host (Vercel, Netlify, ...) cannot proxy to the API
 // host, so the full origin must be baked in at build time:
 //   VITE_API_URL=https://api.example.com npm run build
-const BASE = import.meta.env.VITE_API_URL ?? '';
+// In local development the frontend may not be served by Vite's proxy, so fall
+// back to the Python API running on the default local port.
+const BASE =
+  import.meta.env.VITE_API_URL ??
+  (typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname)
+    ? 'http://127.0.0.1:8000'
+    : '');
 
 export class ApiError extends Error {
   constructor(message, status) {

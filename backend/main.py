@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import auth
+from database import init_db, save_prediction
 from registry import ModelUnavailable, registry
 from schemas import HealthResponse, PatientRequest, PredictionResponse
 
@@ -37,6 +38,7 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     registry.load()  # unpickling once at startup keeps requests fast
+    init_db()
     yield
 
 
@@ -105,7 +107,7 @@ def predict(patient: PatientRequest, staff: str = Depends(_require_auth)):
             detail=f"Model rejected the feature frame: {err}",
         ) from err
 
-    return PredictionResponse(
+    response = PredictionResponse(
         responseProbability=favourable,
         predictedClass=predicted,
         classProbabilities=by_class,
@@ -113,3 +115,12 @@ def predict(patient: PatientRequest, staff: str = Depends(_require_auth)):
         modelName=registry.model.name,
         target=registry.model.target,
     )
+
+    # Persist the request/response pair when PostgreSQL is configured.
+    save_prediction(
+        staff,
+        patient.model_dump(mode="json"),
+        response.model_dump(mode="json"),
+    )
+
+    return response
