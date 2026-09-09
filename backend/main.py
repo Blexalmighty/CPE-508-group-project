@@ -48,7 +48,7 @@ async def lifespan(_app: FastAPI):
 def _allowed_origins() -> list[str]:
     raw = os.environ.get(
         "ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://cpe-508-group-project-tzlz.vercel.app",
+        "http://localhost:5173,http://127.0.0.1:5173,https://onco-predict-one.vercel.app/",
     )
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
