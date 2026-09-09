@@ -134,6 +134,14 @@ def is_admin_identity(identity: str) -> bool:
     return bool(info.get("is_admin", False))
 
 
+def configured_staff_id() -> str:
+    """Return the configured STAFF_ID (falls back to ADMIN_EMAIL)."""
+    staff_id = os.environ.get("STAFF_ID", "").strip()
+    if not staff_id:
+        return ADMIN_EMAIL
+    return staff_id
+
+
 def authenticate(authorization: str | None = Header(default=None)) -> str:
     """FastAPI dependency: validate the Bearer token, return the staff id."""
     if not authorization or not authorization.lower().startswith("bearer "):

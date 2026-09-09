@@ -105,6 +105,16 @@ def health():
     )
 
 
+@app.get("/api/config")
+def config():
+    """Return minimal runtime config useful to the frontend (no secrets)."""
+    try:
+        staff_id = auth.configured_staff_id()
+    except Exception:
+        staff_id = ""
+    return {"staffId": staff_id}
+
+
 @app.post("/api/login", response_model=LoginResponse)
 def login(credentials: LoginRequest):
     """Issue a signed token; the only endpoint reachable without one."""

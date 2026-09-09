@@ -1,16 +1,14 @@
 import { useState } from 'react';
 import { AlertTriangle, ShieldCheck, Stethoscope, User } from 'lucide-react';
-import { login, userLogin, signup } from '../lib/session';
+import { userLogin, signup } from '../lib/session';
 
 const INPUT = 'focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-md py-3 border';
 
 export default function LoginScreen({ onLogin }) {
-  const [staffId, setStaffId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [mode, setMode] = useState('admin'); // 'admin' or 'user'
   const [isSignup, setIsSignup] = useState(false);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,7 +18,7 @@ export default function LoginScreen({ onLogin }) {
     setIsSubmitting(true);
     setError(null);
     // basic client-side validation
-    const emailToUse = mode === 'admin' ? staffId : email || staffId;
+    const emailToUse = email;
     const simpleEmail = /^\S+@\S+\.\S+$/;
     if (!simpleEmail.test(emailToUse)) {
       setError('Enter a valid email address.');
@@ -32,7 +30,7 @@ export default function LoginScreen({ onLogin }) {
       setIsSubmitting(false);
       return;
     }
-    if (mode === 'user' && isSignup) {
+    if (isSignup) {
       if (!name || !name.trim()) {
         setError('Please enter your full name.');
         setIsSubmitting(false);
@@ -45,24 +43,19 @@ export default function LoginScreen({ onLogin }) {
       }
     }
     try {
-      if (mode === 'admin') {
-        await login(staffId, password);
-        onLogin(staffId);
+      if (isSignup) {
+        await signup(emailToUse, password, name);
+        onLogin(emailToUse);
       } else {
-        const who = email || staffId;
-        if (isSignup) {
-          await signup(who, password, name);
-          onLogin(who);
-        } else {
-          await userLogin(who, password);
-          onLogin(who);
-        }
+        await userLogin(emailToUse, password);
+        onLogin(emailToUse);
       }
     } catch (err) {
       setError(err.message || 'Could not reach the login service.');
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -87,25 +80,17 @@ export default function LoginScreen({ onLogin }) {
             </p>
           )}
           <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="flex items-center justify-center gap-4">
-              <button type="button" className={`text-sm ${mode==='admin'?'font-semibold':''}`} onClick={() => {setMode('admin'); setIsSignup(false);}}>
-                Admin
-              </button>
-              <button type="button" className={`text-sm ${mode==='user'?'font-semibold':''}`} onClick={() => {setMode('user');}}>
-                User
-              </button>
-            </div>
             <div className="mt-4" />
             <LoginField
-              id={mode === 'admin' ? 'staffId' : 'email'}
-              label={mode === 'admin' ? 'Admin Email' : 'Email'}
+              id="email"
+              label="Email"
               type="email"
-              placeholder={mode === 'admin' ? 'blessedbaidoo79@gmail.com' : 'you@example.com'}
+              placeholder="you@example.com"
               icon={User}
-              value={mode === 'admin' ? staffId : email}
-              onChange={(value) => mode === 'admin' ? setStaffId(value) : setEmail(value)}
+              value={email}
+              onChange={(value) => setEmail(value)}
             />
-            {mode === 'user' && isSignup && (
+            {isSignup && (
               <LoginField
                 id="name"
                 label="Full name"
@@ -116,11 +101,7 @@ export default function LoginScreen({ onLogin }) {
                 onChange={(value) => setName(value)}
               />
             )}
-            {mode === 'admin' ? (
-              <p className="-mt-4 text-xs text-slate-500">Use the administrator email for access. Password is case-sensitive.</p>
-            ) : (
-              <p className="-mt-4 text-xs text-slate-500">Create an account or sign in with your email.</p>
-            )}
+            <p className="-mt-4 text-xs text-slate-500">Create an account or sign in with your email. If you are the main administrator, sign in with your assigned credentials.</p>
             <LoginField
               id="password"
               label="Password"
@@ -131,7 +112,7 @@ export default function LoginScreen({ onLogin }) {
               onChange={(value) => setPassword(value)}
             />
 
-            {mode === 'user' && isSignup && (
+            {isSignup && (
               <LoginField
                 id="confirmPassword"
                 label="Confirm password"
@@ -143,17 +124,15 @@ export default function LoginScreen({ onLogin }) {
               />
             )}
 
-            {mode === 'user' && (
-              <div className="flex items-center justify-between text-xs">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={isSignup} onChange={() => setIsSignup(!isSignup)} />
-                  <span>Create account</span>
-                </label>
-                <button type="button" className="text-blue-600" onClick={() => { setMode(mode==='admin'?'user':'admin'); setIsSignup(false); }}>
-                  Switch mode
-                </button>
-              </div>
-            )}
+            <div className="flex items-center justify-between text-xs">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={isSignup} onChange={() => setIsSignup(!isSignup)} />
+                <span>{isSignup ? 'Create account' : 'Sign in'}</span>
+              </label>
+              <button type="button" className="text-blue-600" onClick={() => { setIsSignup(!isSignup); }}>
+                {isSignup ? 'Switch to sign in' : 'Switch to sign up'}
+              </button>
+            </div>
 
             <button
               type="submit"
@@ -163,14 +142,7 @@ export default function LoginScreen({ onLogin }) {
               {isSubmitting ? (isSignup ? 'Signing up…' : 'Signing in…') : (isSignup ? 'Sign up' : 'Sign in')}
             </button>
 
-            {mode === 'admin' ? (
-              <p className="text-xs text-center text-slate-400 flex items-center justify-center">
-                <AlertTriangle className="w-3 h-3 mr-1" />
-                Protected admin area — credentials are checked by the server.
-              </p>
-            ) : (
-              <p className="text-xs text-center text-slate-400">Your account credentials are stored securely and checked by the server.</p>
-            )}
+            <p className="text-xs text-center text-slate-400">Your account credentials are stored securely and checked by the server.</p>
           </form>
         </div>
       </div>
