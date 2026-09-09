@@ -18,8 +18,19 @@ import hmac
 import json
 import os
 import time
+import secrets
 
 from fastapi import Header, HTTPException
+from typing import Optional
+
+# Import database lazily to avoid circular imports at module import time.
+def _get_db():
+    try:
+        import database
+
+        return database
+    except Exception:
+        return None
 
 TOKEN_TTL_SECONDS = 8 * 60 * 60  # 8 hours -- one working day
 ADMIN_EMAIL = "blessedbaidoo79@gmail.com"
@@ -79,6 +90,60 @@ def login(staff_id: str, password: str) -> str:
     tag = base64.urlsafe_b64encode(signature).rstrip(b"=")
     # "y2x" is an eyes-only marker; the format is ours, not a JWT.
     return "y2x." + body.decode() + "." + tag.decode()
+
+
+def _issue_token(identity: str) -> str:
+    """Issue a token for `identity` (staff or user email)."""
+    secret = config()[2]
+    payload = {"staff": identity, "exp": int(time.time()) + TOKEN_TTL_SECONDS}
+    body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).rstrip(b"=")
+    signature = hmac.new(secret.encode(), body, hashlib.sha256).digest()
+    tag = base64.urlsafe_b64encode(signature).rstrip(b"=")
+    return "y2x." + body.decode() + "." + tag.decode()
+
+
+def hash_password(password: str, salt: Optional[bytes] = None) -> tuple[str, str]:
+    """Return (hash_hex, salt_hex). Uses PBKDF2-HMAC-SHA256."""
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000)
+    return dk.hex(), salt.hex()
+
+
+def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
+    salt = bytes.fromhex(salt_hex)
+    expected = bytes.fromhex(hash_hex)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000)
+    return hmac.compare_digest(dk, expected)
+
+
+def user_login(email: str, password: str) -> str:
+    """Authenticate a user account stored in the database and return a token."""
+    db = _get_db()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable for user authentication.")
+    auth = db.get_user_auth(email)
+    if not auth:
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+    if not verify_password(password, auth["password_salt"], auth["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+    return _issue_token(email)
+
+
+def is_admin_identity(identity: str) -> bool:
+    """Return True if identity string represents an admin account.
+
+    Identity may be the configured STAFF_ID or a user email with `is_admin` flag.
+    """
+    if identity.lower() == ADMIN_EMAIL.lower():
+        return True
+    db = _get_db()
+    if db is None:
+        return False
+    info = db.get_user_auth(identity)
+    if not info:
+        return False
+    return bool(info.get("is_admin", False))
 
 
 def authenticate(authorization: str | None = Header(default=None)) -> str:
