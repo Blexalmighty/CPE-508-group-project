@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import auth
+import database
 from registry import ModelUnavailable, registry
 from schemas import HealthResponse, PatientRequest, PredictionResponse
 
@@ -37,6 +38,10 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     registry.load()  # unpickling once at startup keeps requests fast
+    try:
+        database.init_db()
+    except Exception as err:
+        log.warning("Database init failed: %s", err)
     yield
 
 
@@ -69,6 +74,24 @@ class LoginResponse(BaseModel):
     staff: str
 
 
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    name: str | None = None
+
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int | None = None
+    email: str | None = None
+    name: str | None = None
+    created_at: str | None = None
+
+
 def _require_auth(staff: str = Depends(auth.authenticate)) -> str:
     return staff
 
@@ -86,6 +109,46 @@ def health():
 def login(credentials: LoginRequest):
     """Issue a signed token; the only endpoint reachable without one."""
     return LoginResponse(token=auth.login(credentials.staffId, credentials.password), staff=credentials.staffId)
+
+
+@app.post("/api/signup", response_model=LoginResponse)
+def signup(payload: SignupRequest):
+    db = database
+    existing = db.get_user_auth(payload.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered.")
+    hash_hex, salt_hex = auth.hash_password(payload.password)
+    try:
+        db.create_user(payload.email, hash_hex, salt_hex, payload.name, is_admin=False)
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=f"Failed to create user: {err}") from err
+    token = auth._issue_token(payload.email)
+    return LoginResponse(token=token, staff=payload.email)
+
+
+@app.post("/api/user_login", response_model=LoginResponse)
+def user_login(payload: UserLoginRequest):
+    token = auth.user_login(payload.email, payload.password)
+    return LoginResponse(token=token, staff=payload.email)
+
+
+@app.get("/api/me", response_model=UserResponse)
+def me(identity: str = Depends(_require_auth)):
+    info = database.get_user_by_email(identity)
+    if not info:
+        return UserResponse(id=None, email=identity, name=None, created_at=None)
+    return UserResponse(id=info.get("id"), email=info.get("email"), name=info.get("name"), created_at=str(info.get("created_at")))
+
+
+@app.get("/api/my_records")
+def my_records(identity: str = Depends(_require_auth)):
+    """Return the authenticated user's prediction history."""
+    try:
+        recs = database.get_prediction_records_for_staff(identity)
+    except Exception as err:
+        log.exception("Failed to query records")
+        raise HTTPException(status_code=500, detail="Could not fetch records") from err
+    return {"records": recs}
 
 
 @app.post("/api/logout")
@@ -122,6 +185,19 @@ def predict(patient: PatientRequest, staff: str = Depends(_require_auth)):
             status_code=500,
             detail=f"Model rejected the feature frame: {err}",
         ) from err
+
+    # Persist the prediction linked to the authenticated identity (email or staff id)
+    try:
+        prediction_payload = {
+            "predictedClass": predicted,
+            "classProbabilities": by_class,
+            "favourable": favourable,
+            "modelName": registry.model.name,
+            "target": registry.model.target,
+        }
+        database.save_prediction(staff, patient.model_dump(), prediction_payload)
+    except Exception:
+        log.exception("Failed to save prediction record")
 
     return PredictionResponse(
         responseProbability=favourable,

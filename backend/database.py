@@ -139,3 +139,27 @@ def list_prediction_records(limit: int = 100) -> list[dict]:
             }
             for r in recs
         ]
+
+
+def get_prediction_records_for_staff(staff_id: str, limit: int = 100) -> list[dict]:
+    """Return prediction records for a specific staff_id/email, most recent first."""
+    if SessionLocal is None:
+        return []
+    with SessionLocal() as session:
+        recs = (
+            session.query(PredictionRecord)
+            .filter(PredictionRecord.staff_id == staff_id)
+            .order_by(PredictionRecord.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "id": r.id,
+                "staff_id": r.staff_id,
+                "patient_payload": r.patient_payload,
+                "prediction_payload": r.prediction_payload,
+                "created_at": r.created_at,
+            }
+            for r in recs
+        ]

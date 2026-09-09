@@ -22,6 +22,26 @@ export async function login(staffId, password) {
   return token;
 }
 
+export async function userLogin(email, password) {
+  const { token } = await apiRequest('/api/user_login', {
+    method: 'POST',
+    body: { email, password },
+  });
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(STAFF_KEY, email);
+  return token;
+}
+
+export async function signup(email, password, name) {
+  const { token } = await apiRequest('/api/signup', {
+    method: 'POST',
+    body: { email, password, name },
+  });
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(STAFF_KEY, email);
+  return token;
+}
+
 export async function logout() {
   const token = getToken();
   clearSession();

@@ -37,35 +37,23 @@ ADMIN_EMAIL = "blessedbaidoo79@gmail.com"
 
 
 def config() -> tuple[str, str, str]:
-    """(staff_id, password, secret); raises if any piece is missing."""
-    # The admin access account is pinned to this email so the application can
-    # always authenticate against the intended administrator while still reading
-    # the password and token secret from configuration.
-    staff_id = os.environ.get("STAFF_ID", ADMIN_EMAIL).strip() or ADMIN_EMAIL
-    if staff_id.lower() != ADMIN_EMAIL.lower():
-        staff_id = ADMIN_EMAIL
+    """(staff_id, password, secret).
 
+    STAFF_ID and STAFF_PASSWORD are optional in the new workflow: user
+    accounts are stored in the database and the token secret is the only
+    required configuration. Return (staff_id, staff_password, token_secret).
+    """
+    staff_id = os.environ.get("STAFF_ID", ADMIN_EMAIL).strip() or ADMIN_EMAIL
     password = os.environ.get("STAFF_PASSWORD", "")
     secret = os.environ.get("TOKEN_SECRET", "").strip()
 
-    missing = [
-        name
-        for name, value in (
-            ("STAFF_ID", staff_id),
-            ("STAFF_PASSWORD", password),
-            ("TOKEN_SECRET", secret),
-        )
-        if not value
-    ]
-    if missing:
+    if not secret:
         raise RuntimeError(
-            "Authentication is misconfigured -- set " + ", ".join(missing)
-            + " (a `.env` file next to main.py is fine; see backend/.env.example)."
+            "Authentication misconfigured -- set TOKEN_SECRET (see backend/.env.example)."
         )
     if len(secret) < 16:
         raise RuntimeError(
-            "TOKEN_SECRET is too short -- use at least 16 characters, "
-            "preferably 32+ from `python -c \"import secrets; print(secrets.token_urlsafe(32))\"`."
+            "TOKEN_SECRET is too short -- use at least 16 characters, preferably 32+."
         )
     return staff_id, password, secret
 
